@@ -11,10 +11,16 @@
 	.forceimport	__STARTUP__
 	; .import		_printf
 	.export		_main
+	.linecont	+
 
 .segment	"RODATA"
 ; L0003:		; "Hello, World!"
 	; .byte	$C8,$45,$4C,$4C,$4F,$2C,$20,$46,$4F,$4C,$4B,$53,$21,$0D,$00
+BAR:
+	.byte  96,103,106,118,225,245,244,229,\
+	      224,231,234,246, 97,117,116,101
+COUNT:
+	.byte 0
 
 ; ---------------------------------------------------------------
 ; void __near__ main (void)
@@ -26,8 +32,7 @@
 
 .segment	"CODE"
 
-raster_timer:
-
+raster_timer:				; usually placed at $0840
 
 	lda		#100
 wait1: ; for scan line 0
@@ -45,15 +50,29 @@ wait1: ; for scan line 0
 ; 3,585 cycles / ~64.83 cycles/raster-line 	 	= ~55.3 raster lines
 ; Cycle counts from _Commodore 64 Programmer's Reference Guide_
 ; -------------------------------------------------------------------
-	ldx		#0 				; x = 0						2 cycles
-print_loop:					; do
-	txa						; 	a = x					2 cycles
-	sta		$0400,x			; 	*(0x0400 + x) = a		5 cycles
-	inx						; 	x++						2 cycles
+; 	ldx		#0 				; x = 0						2 cycles
+; print_loop:					; do
+; 	txa						; 	a = x					2 cycles
+; 	sta		$0400,x			; 	*(0x0400 + x) = a		5 cycles
+; 	inx						; 	x++						2 cycles
 
-	cpx		#0				; while (x != 0)			2 cycles
-	bne		print_loop		;							3 cycles (I think)
+; 	cpx		#0				; while (x != 0)			2 cycles
+; 	bne		print_loop		;							3 cycles (I think)
 ; -------------------------------------------------------------------
+
+; -------------------------------------------------------------------
+; a small experiment for a text-mode, scrolling marquee
+; See https://www.youtube.com/watch?v=6o9Hi_WrfIA
+; -------------------------------------------------------------------
+	ldy		COUNT			; y = *count
+	cpy		#16				; if (y == 8) {
+	bne		NO_RESET
+	ldy		#0				;    y = 0
+NO_RESET:					; }
+	lda		BAR,y			; a = *(bar + y)
+	sta		$0400			; *0x0400 = a    // first char on screen
+	iny						; y++
+	sty		COUNT			; *count = y
 
 ; -------------------------------------------------------------------
 ; wait 55 more raster lines, for comparison
@@ -61,12 +80,12 @@ print_loop:					; do
 ; is a little larger than this one, so the previous routine takes
 ; longer to run than predicted.
 ; -------------------------------------------------------------------
-	inc 	$d020
-	lda		#210			; artificially wait 55 scan lines
-wait2: ; for appointed scan line
-	cmp		$d012			; VIC raster counter
-	bne		wait2
-	dec 	$d020			; reset border color
+; 	inc 	$d020
+; 	lda		#210			; artificially wait 55 scan lines
+; wait2: ; for appointed scan line
+; 	cmp		$d012			; VIC raster counter
+; 	bne		wait2
+; 	dec 	$d020			; reset border color
 ; -------------------------------------------------------------------
 	
 	dec 	$d020			; reset border color
