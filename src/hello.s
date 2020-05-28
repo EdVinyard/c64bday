@@ -17,10 +17,14 @@
 ; L0003:		; "Hello, World!"
 	; .byte	$C8,$45,$4C,$4C,$4F,$2C,$20,$46,$4F,$4C,$4B,$53,$21,$0D,$00
 BAR:
-	.byte  96,103,106,118,225,245,244,229,\
-	      224,231,234,246, 97,117,116,101
-COUNT:
-	.byte 0
+	; 256 bytes
+	.byte  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+END:
+	.byte 30
+START:
+	.byte 1
+FULL_BLOCK:
+	.byte 224 			; 96 (empty) + 128
 
 ; ---------------------------------------------------------------
 ; void __near__ main (void)
@@ -31,6 +35,71 @@ COUNT:
 .proc	_main: near
 
 .segment	"CODE"
+
+; initialize the array that describes the animation frames
+	;  96,103,106,118,225,245,244,229,\
+    ; 224,231,234,246, 97,117,116,101
+
+	lda #96		; blank
+	ldx START
+INITLOOP:
+	sta $0400,x
+	inx
+	cpx END
+	bne INITLOOP
+
+	ldx #96
+	lda #103
+	sta BAR,x
+	ldx #103
+	lda #106
+	sta BAR,x
+	ldx #106
+	lda #118
+	sta BAR,x
+	ldx #118
+	lda #225
+	sta BAR,x
+	ldx #225
+	lda #245
+	sta BAR,x
+	ldx #245
+	lda #244
+	sta BAR,x
+	ldx #244
+	lda #229
+	sta BAR,x
+	ldx #229
+	lda #224
+	sta BAR,x
+	ldx #224
+	lda #231
+	sta BAR,x
+	ldx #231
+	lda #234
+	sta BAR,x
+	ldx #234
+	lda #246
+	sta BAR,x
+	ldx #246
+	lda #97
+	sta BAR,x
+	ldx #97
+	lda #117
+	sta BAR,x
+	ldx #117
+	lda #116
+	sta BAR,x
+	ldx #116
+	lda #101
+	sta BAR,x
+	ldx #101
+	lda #96
+	sta BAR,x
+
+; initialize the rightmost screen char
+	lda 	#103
+	sta 	$040a
 
 raster_timer:				; usually placed at $0840
 
@@ -64,15 +133,25 @@ wait1: ; for scan line 0
 ; a small experiment for a text-mode, scrolling marquee
 ; See https://www.youtube.com/watch?v=6o9Hi_WrfIA
 ; -------------------------------------------------------------------
-	ldy		COUNT			; y = *count
-	cpy		#16				; if (y == 8) {
-	bne		NO_RESET
-	ldy		#0				;    y = 0
-NO_RESET:					; }
-	lda		BAR,y			; a = *(bar + y)
-	sta		$0400			; *0x0400 = a    // first char on screen
+
+	ldy		START			; y = START
+MARQUEE:					; do {
+	lda		$0400,y
+	tax						; x is the old character
+	lda		BAR,x			; a is the new character
+	sta		$0400,y			; *(0x0400+y) = BAR[old_char]
+
+	cpx		FULL_BLOCK		; if (*(0x0400+y) == FULLBLOCK) {
+	bne		NOT_FULL_BLOCK
+	lda		#103			;   *(0x0400+y-1) = 103
+	dey
+	sta		$0400,y
+	iny
+NOT_FULL_BLOCK:				; }
+
 	iny						; y++
-	sty		COUNT			; *count = y
+	cpy		END				; } while (y != END);
+	bne		MARQUEE
 
 ; -------------------------------------------------------------------
 ; wait 55 more raster lines, for comparison
