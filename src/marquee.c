@@ -1,11 +1,11 @@
 #define uchar unsigned char
 
-uchar* SCREEN = (uchar*)0x0400;
-const uchar COLS = 40;
+#define SCREEN ((uchar*)0x0400)
+#define COLS (40);
 
-uchar* BORDER = (uchar*)0xd020;
-uchar const* RASTER_COUNTER = (uchar*)0xd012;
-uchar const* CHARSET = (uchar*)0xd800;
+#define BORDER ((uchar*)0xd020)
+#define RASTER_COUNTER ((uchar*)0xd012)
+#define CHARSET ((uchar*)0xd800)
 
 const uchar EMPTY_BLOCK[8]   = {  96,  96,  96,  96,  96,  96,  96,  96 };
 const uchar FULL_BLOCK[8]    = { 224, 224, 224, 224, 224, 224, 224, 224 };
@@ -53,6 +53,8 @@ void main(void)
                 //*(SCREEN+80) = screen_offset + 48; // show scr_offset on screen
                 *(SCREEN+screen_offset) = new_char;
             }
+
+            __asm__("inc $d020");
         }
     }
 }
