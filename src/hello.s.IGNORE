@@ -19,12 +19,14 @@
 BAR:
 	; 256 bytes
 	.byte  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-END:
-	.byte 30
 START:
 	.byte 1
+END:
+	.byte 30
+EMPTY_BLOCK:
+	.byte 96			; FULL_BLOCK - 128
 FULL_BLOCK:
-	.byte 224 			; 96 (empty) + 128
+	.byte 224 			; EMPTY_BLOCK + 128
 
 ; ---------------------------------------------------------------
 ; void __near__ main (void)
@@ -49,7 +51,7 @@ INITLOOP:
 	bne INITLOOP
 
 	ldx #96
-	lda #103
+	lda #96;#103
 	sta BAR,x
 	ldx #103
 	lda #106
@@ -97,9 +99,20 @@ INITLOOP:
 	lda #96
 	sta BAR,x
 
-; initialize the rightmost screen char
-	lda 	#103
-	sta 	$040a
+; initialize the screen chars
+	lda		#96
+	ldx		START
+INIT_SCREEN_CHAR_LOOP:
+	sta 	$0400,x
+	inx
+	cpx		END
+	bne		INIT_SCREEN_CHAR_LOOP
+; initialize the two rightmost screen chars
+	dex
+	lda		FULL_BLOCK
+	sta		$0400,x
+	dex
+	sta		$0400,x
 
 raster_timer:				; usually placed at $0840
 
@@ -138,19 +151,34 @@ wait1: ; for scan line 0
 MARQUEE:					; do {
 	lda		$0400,y
 	tax						; x is the old character
-	lda		BAR,x			; a is the new character
-	sta		$0400,y			; *(0x0400+y) = BAR[old_char]
 
-	cpx		FULL_BLOCK		; if (*(0x0400+y) == FULLBLOCK) {
-	bne		NOT_FULL_BLOCK
-	lda		#103			;   *(0x0400+y-1) = 103
-	dey
-	sta		$0400,y
+							;   if (
+	cpx		FULL_BLOCK		;       old_char == FULL_BLOCK 
+	bne		ELSE
 	iny
-NOT_FULL_BLOCK:				; }
+	lda		$0400,y
+	dey
+	cmp		EMPTY_BLOCK		;       && next_char != EMPTY_BLOCK) {
+	beq		ELSE
+	
+	jmp    	FI              ;     screen[y] remains FULL_BLOCK
+ELSE:                       ;   } else {
+	lda		BAR,x			;
+	sta		$0400,y			;     screen[y] = BAR[old_char] 
+FI:							;   }	
+
+	cpx		FULL_BLOCK		;   if (old_char == FULLBLOCK) {
+	bne		NOT_FULL_BLOCK
+	lda		#103			
+	dey
+	sta		$0400,y			;     prev_char = 103
+	iny
+NOT_FULL_BLOCK:				;   }
 
 	iny						; y++
 	cpy		END				; } while (y != END);
+
+	rts						; STARTHERE
 	bne		MARQUEE
 
 ; -------------------------------------------------------------------

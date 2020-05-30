@@ -27,7 +27,7 @@ CONFIG  :=
 
 # Additional C compiler flags and options.
 # Default: none
-CFLAGS  =
+CFLAGS  = 
 
 # Additional assembler flags and options.
 # Default: none
@@ -47,7 +47,7 @@ OBJDIR :=
 
 # Command used to run the emulator.
 # Default: depending on target platform. For default (c64) target: x64 -kernal kernal -VICIIdsize -autoload
-EMUCMD := x64 -ntsc
+EMUCMD := x64 -ntsc -speed 3
 
 # Optional commands used before starting the emulation process, and after finishing it.
 # Default: none
