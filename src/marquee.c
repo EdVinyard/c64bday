@@ -1,3 +1,4 @@
+
 #define uchar unsigned char
 
 #define SCREEN ((uchar*)0x0400)
@@ -32,18 +33,18 @@ const uchar CONTENT[CONTENT_LEN] = {
     16,  8,  8,  8,   8,  8,  8, 24,  16,  8,  8,  8,   8,  8,  8, 24, 
     };
 
+uchar screen_offset = 0;
+uchar content_offset = 0;
+uchar content_index = 0;
+uchar frame_index = 0;
+uchar animation = 0;
+uchar new_char = 5; // 'e' for error
+
 void main(void)
 {
-    static uchar screen_offset = 0;
-    static uchar content_offset = 0;
-    static uchar content_index = 0;
-    static uchar frame_index = 0;
-    static uchar animation = 0;
-    static uchar new_char = 5; // 'e' for error
-
     while (1) {
         // walk the content right-to-left across the screen
-        for (content_offset = 0; content_offset < 40; content_offset++) {
+        for (content_offset = 0; content_offset < CONTENT_LEN; content_offset++) {
             
             // draw each frame of the eight-frame animation for a smooth transition
             for (frame_index = 0; frame_index < 8; frame_index++) {
@@ -62,11 +63,34 @@ void main(void)
                     BORDER_CHANGE;
 
                     // draw one cell
-                    content_index = (CONTENT_LEN-1) & (screen_offset + content_offset); // HACK: cheap modulo
-                    animation = CONTENT[content_index];
-                    new_char = ANIMATIONS[animation + frame_index];
 
-                    *(SCREEN+screen_offset) = new_char;
+                    // content_index = (CONTENT_LEN-1) & (screen_offset + content_offset); // HACK: cheap modulo
+                    __asm__ ("lda %v", screen_offset);  // A = screen_offset
+                    __asm__ ("tax");
+                    __asm__ ("clc");
+                    __asm__ ("adc %v", content_offset); // A = A + content_offset
+                    __asm__ ("and #%b", CONTENT_LEN-1); // A = A & 63 // cheap modulo
+                    //__asm__ ("sta %v", content_index);  // content_index = A
+                    // content_index is in register A
+                    // screen_offset is in register X
+
+                    // animation = CONTENT[content_index];
+                    __asm__ ("tay");
+                    __asm__ ("lda %v,y", CONTENT);
+                    //__asm__ ("sta %v", animation);
+                    // animation is in register A
+                    // screen_offset is in register X
+
+                    //new_char = ANIMATIONS[animation + frame_index];
+                    __asm__ ("clc");
+                    __asm__ ("adc %v", frame_index);
+                    __asm__ ("tay");
+                    __asm__ ("lda %v,y", ANIMATIONS);
+                    // new_char is in register A
+                    // screen_offset is in register X
+
+                    //*(SCREEN+screen_offset) = new_char;
+                    __asm__ ("sta $0400,x");
                 }
 
                 BORDER_CHANGE;
