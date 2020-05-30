@@ -11,22 +11,25 @@
 __asm__("lda #0"); \
 __asm__("sta $d020")
 
-const uchar EMPTY_BLOCK[8]   = {  96,  96,  96,  96,  96,  96,  96,  96 };
-const uchar FULL_BLOCK[8]    = { 224, 224, 224, 224, 224, 224, 224, 224 };
-const uchar EMPTY_TO_FULL[8] = {  96, 103, 106, 118, 225, 245, 244, 229 };
-const uchar FULL_TO_EMPTY[8] = { 224, 231, 234, 246,  97, 117, 116, 101 };
-const uchar* ANIMATIONS[4] = { EMPTY_BLOCK, FULL_BLOCK, EMPTY_TO_FULL, FULL_TO_EMPTY };
+// Each value in ANIMATIONS is a PETSCII character index.
+const uchar ANIMATIONS[32]   = {
+     96,  96,  96,  96,  96,  96,  96,  96, // EMPTY_BLOCK
+    224, 224, 224, 224, 224, 224, 224, 224, // FULL_BLOCK
+     96, 103, 106, 118, 225, 245, 244, 229, // EMPTY_TO_FULL
+    224, 231, 234, 246,  97, 117, 116, 101, // FULL_TO_EMPTY
+};
 
 #define CONTENT_LEN (64)
-// 0 - EMPTY_BLOCK
-// 1 - FULL_BLOCK
-// 2 - EMPTY_TO_FULL
-// 3 - FULL_TO_EMPTY
+// each CONTENT value is a base index into ANIMATIONS
+//  0 - EMPTY_BLOCK
+//  8 - FULL_BLOCK
+// 16 - EMPTY_TO_FULL
+// 24 - FULL_TO_EMPTY
 const uchar CONTENT[CONTENT_LEN] = { 
-    2, 3, 0, 0,  2, 3, 0, 0,  2, 3, 0, 0,  2, 3, 0, 0,
-    2, 1, 3, 0,  2, 1, 3, 0,  2, 1, 3, 0,  2, 1, 3, 0,
-    2, 1, 1, 3,  0, 0, 0, 0,  2, 1, 1, 3,  0, 0, 0, 0,
-    2, 1, 1, 1,  1, 1, 1, 3,  2, 1, 1, 1,  1, 1, 1, 3, 
+    16, 24,  0,  0,  16, 24,  0,  0,  16, 24,  0,  0,  16, 24,  0,  0,
+    16,  8, 24,  0,  16,  8, 24,  0,  16,  8, 24,  0,  16,  8, 24,  0,
+    16,  8,  8, 24,   0,  0,  0,  0,  16,  8,  8, 24,   0,  0,  0,  0,
+    16,  8,  8,  8,   8,  8,  8, 24,  16,  8,  8,  8,   8,  8,  8, 24, 
     };
 
 void main(void)
@@ -35,8 +38,7 @@ void main(void)
     static uchar content_offset = 0;
     static uchar content_index = 0;
     static uchar frame_index = 0;
-    static uchar cell_animation_type = 0;
-    static const uchar* cell_animation;
+    static uchar animation = 0;
     static uchar new_char = 5; // 'e' for error
 
     while (1) {
@@ -60,13 +62,11 @@ void main(void)
                     BORDER_CHANGE;
 
                     // draw one cell
-                    content_index = (CONTENT_LEN-1) & (screen_offset + content_offset); // KLUDGE: cheap modulo
-                    cell_animation_type = CONTENT[content_index];
-                    cell_animation = ANIMATIONS[cell_animation_type];
-                    new_char = cell_animation[frame_index];
+                    content_index = (CONTENT_LEN-1) & (screen_offset + content_offset); // HACK: cheap modulo
+                    animation = CONTENT[content_index];
+                    new_char = ANIMATIONS[animation + frame_index];
 
                     *(SCREEN+screen_offset) = new_char;
-                    __asm__("inc %v", content_index);
                 }
 
                 BORDER_CHANGE;
