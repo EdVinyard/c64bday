@@ -33,65 +33,108 @@ const uchar CONTENT[CONTENT_LEN] = {
     16,  8,  8,  8,   8,  8,  8, 24,  16,  8,  8,  8,   8,  8,  8, 24, 
     };
 
-uchar screen_offset = 0;
-uchar content_offset = 0;
-uchar content_index = 0;
-uchar frame_index = 0;
-uchar animation = 0;
-uchar new_char = 5; // 'e' for error
+uchar frame_index;
+
+// RenderRow arguments
+uchar  RenderRow_content_offset = 0; // leftmost screen char shows content[offset]
+const uchar* RenderRow_content; // pointer to start of row content
+uchar* RenderRow_screen;  // pointer to leftmost char in screen row
+#undef RR_SLOW
+void RenderRow() {
+    register uchar* screen;
+    register const uchar* content;
+    static uchar col;
+    static uchar content_index;
+#ifdef RR_SLOW
+    static uchar animation;
+    static uchar new_char;
+#endif
+
+    screen = RenderRow_screen;
+    content = RenderRow_content;
+
+    // draw each character in the row
+    for (col = 0; col < COLS; col++) {
+        //BORDER_CHANGE;
+
+        // draw one character/cell
+#ifdef RR_SLOW
+        content_index = (CONTENT_LEN-1) & (col + RenderRow_content_offset); // HACK: cheap modulo
+#else
+        __asm__ ("lda %v", col);  // A = col
+        __asm__ ("clc");
+        __asm__ ("adc %v", RenderRow_content_offset); // A = A + content_offset
+        __asm__ ("and #%b", CONTENT_LEN-1); // A = A & 63 // cheap modulo
+// SLOW __asm__ ("sta %v", content_index);  // content_index = A
+        // content_index is in register A
+#endif
+
+#ifdef RR_SLOW
+        animation = RenderRow_content[content_index]; // was CONTENT[...]
+#else
+        __asm__ ("tay");
+        __asm__ ("lda (%v),y", content);
+// SLOW __asm__ ("sta %v", animation);
+        // animation is in register A
+#endif
+
+#ifdef RR_SLOW
+        new_char = ANIMATIONS[animation + frame_index];
+#else
+        __asm__ ("clc");
+        __asm__ ("adc %v", frame_index);
+        __asm__ ("tay");
+        __asm__ ("lda %v,y", ANIMATIONS);
+// SLOW __asm__ ("sta %v", new_char);
+        // new_char is in register A
+#endif
+
+#ifdef RR_SLOW
+        *(SCREEN+col) = new_char;
+#else
+        __asm__ ("ldy %v", col);
+        __asm__ ("sta (%v),y", screen);
+#endif
+    }    
+}
 
 void main(void)
 {
+    RenderRow_content = CONTENT;
+
     while (1) {
         // walk the content right-to-left across the screen
-        for (content_offset = 0; content_offset < CONTENT_LEN; content_offset++) {
-            
+        for (RenderRow_content_offset = 0; 
+             RenderRow_content_offset < CONTENT_LEN; 
+             RenderRow_content_offset++
+        ) {
             // draw each frame of the eight-frame animation for a smooth transition
             for (frame_index = 0; frame_index < 8; frame_index++) {
                 //while (*RASTER_COUNTER != 64);
-                __asm__("lda #100");
+                __asm__("lda #64");
                 rasterwait:
                 __asm__("cmp $d012"); // VIC2 raster index/counter
                 __asm__("bne %g", rasterwait);
                 
                 BORDER_RESET;
 
-                *(SCREEN+80) = frame_index + 48; // display frame index on screen
+                *(SCREEN+200) = frame_index + 48; // display frame index on screen
 
-                // draw each character in the row
-                for (screen_offset = 0; screen_offset < COLS; screen_offset++) {
-                    BORDER_CHANGE;
+                BORDER_CHANGE;
+                RenderRow_screen = SCREEN;
+                RenderRow();
 
-                    // draw one cell
+                BORDER_CHANGE;
+                RenderRow_screen = SCREEN+40;
+                RenderRow();
 
-                    // content_index = (CONTENT_LEN-1) & (screen_offset + content_offset); // HACK: cheap modulo
-                    __asm__ ("lda %v", screen_offset);  // A = screen_offset
-                    __asm__ ("tax");
-                    __asm__ ("clc");
-                    __asm__ ("adc %v", content_offset); // A = A + content_offset
-                    __asm__ ("and #%b", CONTENT_LEN-1); // A = A & 63 // cheap modulo
-                    //__asm__ ("sta %v", content_index);  // content_index = A
-                    // content_index is in register A
-                    // screen_offset is in register X
+                BORDER_CHANGE;
+                RenderRow_screen = SCREEN+80;
+                RenderRow();
 
-                    // animation = CONTENT[content_index];
-                    __asm__ ("tay");
-                    __asm__ ("lda %v,y", CONTENT);
-                    //__asm__ ("sta %v", animation);
-                    // animation is in register A
-                    // screen_offset is in register X
-
-                    //new_char = ANIMATIONS[animation + frame_index];
-                    __asm__ ("clc");
-                    __asm__ ("adc %v", frame_index);
-                    __asm__ ("tay");
-                    __asm__ ("lda %v,y", ANIMATIONS);
-                    // new_char is in register A
-                    // screen_offset is in register X
-
-                    //*(SCREEN+screen_offset) = new_char;
-                    __asm__ ("sta $0400,x");
-                }
+                BORDER_CHANGE;
+                RenderRow_screen = SCREEN+120;
+                RenderRow();
 
                 BORDER_CHANGE;
             }
