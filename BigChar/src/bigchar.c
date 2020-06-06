@@ -70,13 +70,14 @@ void setup_custom_char_set() {
     *CHARSET_PTR = vic2_screen_reg;
 }
 
-void render(uchar* screen, uchar char_code) {
+void render_slow(uchar* screen, uchar char_code) {
     uchar row;
     uchar bitmap_row;
     uchar bitmap_mask;
     uchar* bitmap = CHARSET_CUSTOM + (8*char_code);
 
     for (row = 0; row < 8; row++) {
+        BORDER_CHANGE;
         bitmap_row = bitmap[row];
 
         bitmap_mask = 128;
@@ -94,6 +95,10 @@ void render(uchar* screen, uchar char_code) {
     }
 }
 
+void render_fast(uchar* screen, uchar char_code) {
+    // STARTHERE
+}
+
 void main(void)
 {
     BORDER_RESET;
@@ -108,8 +113,8 @@ void main(void)
         BORDER_RESET;
 
         BORDER_CHANGE;
-        render(SCREEN, 0);
-        render(SCREEN+7, 1); // more than 1 frame to render 2 chars!!
+        render_fast(SCREEN, 1);
+        render_slow(SCREEN+7, 2); // more than 1 frame to render 2 chars!!
         BORDER_CHANGE;
     }
 }
