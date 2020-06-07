@@ -16,6 +16,7 @@ __asm__("sta $d020")
 #define TRIANGLE (16)
 #define SAWTOOTH (32)
 #define PULSE (64)
+#define NOISE (128)
 
 const uchar voice1 = PULSE;
 const uchar voice2 = TRIANGLE;
@@ -97,7 +98,7 @@ void clear_sid_registers() {
 
 uchar hf;
 uchar lf;
-void multiple_voice_example() {
+void two_voice_example() {
     uchar i;
     uchar dr;
     short f;
@@ -166,5 +167,5 @@ void main(void)
 {
     clear_sid_registers();
     // while (1) single_voice_example();
-    while (1) multiple_voice_example();
+    while (1) two_voice_example();
 }
