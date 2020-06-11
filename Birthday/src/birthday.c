@@ -24,7 +24,7 @@ __asm__("sta $d020")
 
 #define MESSAGE_LEN (22)
 // max 214
-#define MARQUEE_ROW_LEN (8*MESSAGE_LEN)
+#define MARQUEE_ROW_LEN (7*MESSAGE_LEN)
 uchar row0[MARQUEE_ROW_LEN];
 uchar row1[MARQUEE_ROW_LEN];
 uchar row2[MARQUEE_ROW_LEN];
@@ -124,16 +124,20 @@ void init_marquee(uchar* message, uchar len) {
     init_marquee_row(row6, 6, message, len);
 }
 
+#define SLOW
+uchar screen_col;
+uchar source_index;
 void render_marquee_row(
-    uchar* screen,
-    uchar* src,
-    uchar src_offset) 
+    uchar* _screen,
+    uchar* _source,
+    uchar _offset)
 {
-    uchar screen_col;
-    uchar source_index;
+    register uchar* screen = _screen;
+    register uchar* source = _source;
+#ifdef SLOW
     
     for (screen_col = 0,
-         source_index = (src_offset + screen_col) % MARQUEE_ROW_LEN;
+         source_index = (_offset + screen_col) % MARQUEE_ROW_LEN;
          screen_col < 40; 
          screen_col++, source_index++) 
     {
@@ -143,8 +147,11 @@ void render_marquee_row(
             source_index = 0;
         }
 
-        screen[screen_col] = src[source_index];
+        screen[screen_col] = source[source_index];
     }
+#else
+
+#endif
 }
 
 void main(void)
