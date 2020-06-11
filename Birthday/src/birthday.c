@@ -124,9 +124,9 @@ void init_marquee(uchar* message, uchar len) {
     init_marquee_row(row6, 6, message, len);
 }
 
-#define SLOW
-uchar screen_col;
-uchar source_index;
+#define FAST
+static uchar screen_col;
+static uchar source_index;
 void render_marquee_row(
     uchar* _screen,
     uchar* _source,
@@ -134,8 +134,7 @@ void render_marquee_row(
 {
     register uchar* screen = _screen;
     register uchar* source = _source;
-#ifdef SLOW
-    
+#ifndef FAST
     for (screen_col = 0,
          source_index = (_offset + screen_col) % MARQUEE_ROW_LEN;
          screen_col < 40; 
@@ -150,7 +149,13 @@ void render_marquee_row(
         screen[screen_col] = source[source_index];
     }
 #else
+    __asm__("ldy #39");
 
+render_marquee_loop:
+    __asm__("lda (%v),y", source);
+    __asm__("sta (%v),y", screen);
+    __asm__("dey");
+    __asm__("bne %g", render_marquee_loop);
 #endif
 }
 
@@ -159,7 +164,7 @@ void main(void)
     uchar i;
     copy_char_bitmaps_to_0x3000();
     init_marquee(message, MESSAGE_LEN);
-
+    
     for (i = 24; ; i++) {
         // while (*RASTER_COUNTER != 64);
         __asm__("lda #32");
@@ -170,12 +175,18 @@ void main(void)
 
         BORDER_CHANGE;
         render_marquee_row(SCREEN,     row0, i);
-        // render_marquee_row(SCREEN+ 40, row1, i);
-        // render_marquee_row(SCREEN+ 80, row2, i);
-        // render_marquee_row(SCREEN+120, row3, i);
-        // render_marquee_row(SCREEN+160, row4, i);
-        // render_marquee_row(SCREEN+200, row5, i);
-        // render_marquee_row(SCREEN+240, row6, i);
+        BORDER_CHANGE;
+        render_marquee_row(SCREEN+ 40, row1, i);
+        BORDER_CHANGE;
+        render_marquee_row(SCREEN+ 80, row2, i);
+        BORDER_CHANGE;
+        render_marquee_row(SCREEN+120, row3, i);
+        BORDER_CHANGE;
+        render_marquee_row(SCREEN+160, row4, i);
+        BORDER_CHANGE;
+        render_marquee_row(SCREEN+200, row5, i);
+        BORDER_CHANGE;
+        render_marquee_row(SCREEN+240, row6, i);
         BORDER_CHANGE;
     }
 }
