@@ -24,14 +24,14 @@ __asm__("sta $d020")
 
 #define MESSAGE_LEN (22)
 // max 214
-#define MARQUEE_ROW_LEN (7*MESSAGE_LEN)
-uchar row0[MARQUEE_ROW_LEN];
-uchar row1[MARQUEE_ROW_LEN];
-uchar row2[MARQUEE_ROW_LEN];
-uchar row3[MARQUEE_ROW_LEN];
-uchar row4[MARQUEE_ROW_LEN];
-uchar row5[MARQUEE_ROW_LEN];
-uchar row6[MARQUEE_ROW_LEN];
+#define MARQUEE_ROW_LEN (7*MESSAGE_LEN + 40)
+uchar row0[256];
+uchar row1[256];
+uchar row2[256];
+uchar row3[256];
+uchar row4[256];
+uchar row5[256];
+uchar row6[256];
 
 uchar message[MESSAGE_LEN] = {
     // "HAPPY "
@@ -96,6 +96,16 @@ void init_marquee_row(
     uchar char_bitmap;
     uchar character;
 
+    // fill the whole marquee row with blanks
+    marquee_idx = 255;
+    do {
+        marquee_row[marquee_idx--] = EMPTY_BLOCK;
+    } while (marquee_idx != 0);
+    marquee_row[marquee_idx] = EMPTY_BLOCK;
+
+    // blanks for the first full screen width of columns
+    marquee_row = marquee_row + 40; 
+
     for (message_idx = 0; message_idx < message_len; message_idx++) {
         character = message[message_idx];
         char_bitmap = CHARSET_CUSTOM[character*8+char_bitmap_row];
@@ -124,39 +134,23 @@ void init_marquee(uchar* message, uchar len) {
     init_marquee_row(row6, 6, message, len);
 }
 
-#define FAST
-static uchar screen_col;
-static uchar source_index;
 void render_marquee_row(
     uchar* _screen,
     uchar* _source,
     uchar _offset)
 {
     register uchar* screen = _screen;
-    register uchar* source = _source;
-#ifndef FAST
-    for (screen_col = 0,
-         source_index = (_offset + screen_col) % MARQUEE_ROW_LEN;
-         screen_col < 40; 
-         screen_col++, source_index++) 
-    {
-        BORDER_CHANGE;
-
-        if (source_index >= MARQUEE_ROW_LEN) {
-            source_index = 0;
-        }
-
-        screen[screen_col] = source[source_index];
-    }
-#else
-    __asm__("ldy #39");
+    register uchar* source = _source + _offset;
+    __asm__("ldy #40");
 
 render_marquee_loop:
     __asm__("lda (%v),y", source);
     __asm__("sta (%v),y", screen);
     __asm__("dey");
     __asm__("bne %g", render_marquee_loop);
-#endif
+
+    __asm__("lda (%v),y", source);
+    __asm__("sta (%v),y", screen);
 }
 
 void main(void)
@@ -164,29 +158,31 @@ void main(void)
     uchar i;
     copy_char_bitmaps_to_0x3000();
     init_marquee(message, MESSAGE_LEN);
-    
-    for (i = 24; ; i++) {
-        // while (*RASTER_COUNTER != 64);
-        __asm__("lda #32");
-        rasterwait:
-        __asm__("cmp $d012"); // VIC2 raster index/counter
-        __asm__("bne %g", rasterwait);
-        BORDER_RESET;
 
-        BORDER_CHANGE;
-        render_marquee_row(SCREEN,     row0, i);
-        BORDER_CHANGE;
-        render_marquee_row(SCREEN+ 40, row1, i);
-        BORDER_CHANGE;
-        render_marquee_row(SCREEN+ 80, row2, i);
-        BORDER_CHANGE;
-        render_marquee_row(SCREEN+120, row3, i);
-        BORDER_CHANGE;
-        render_marquee_row(SCREEN+160, row4, i);
-        BORDER_CHANGE;
-        render_marquee_row(SCREEN+200, row5, i);
-        BORDER_CHANGE;
-        render_marquee_row(SCREEN+240, row6, i);
-        BORDER_CHANGE;
+    while (1) {
+        for (i = 0; i < MARQUEE_ROW_LEN; i++) {
+            // while (*RASTER_COUNTER != 64);
+            __asm__("lda #64");
+            rasterwait:
+            __asm__("cmp $d012"); // VIC2 raster index/counter
+            __asm__("bne %g", rasterwait);
+            BORDER_RESET;
+
+            BORDER_CHANGE;
+            render_marquee_row(SCREEN,     row0, i);
+            BORDER_CHANGE;
+            render_marquee_row(SCREEN+ 40, row1, i);
+            BORDER_CHANGE;
+            render_marquee_row(SCREEN+ 80, row2, i);
+            BORDER_CHANGE;
+            render_marquee_row(SCREEN+120, row3, i);
+            BORDER_CHANGE;
+            render_marquee_row(SCREEN+160, row4, i);
+            BORDER_CHANGE;
+            render_marquee_row(SCREEN+200, row5, i);
+            BORDER_CHANGE;
+            render_marquee_row(SCREEN+240, row6, i);
+            BORDER_CHANGE;
+        }
     }
 }
