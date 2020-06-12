@@ -15,6 +15,8 @@
 #define INTERRUPT_DISABLE (*INTERRUPT = *INTERRUPT & 254)
 #define INTERRUPT_ENABLE  (*INTERRUPT = *INTERRUPT | 1)
 
+#define HORIZONTAL_SCROLL ((uchar*)0xd016)
+
 #define RASTER_COUNTER ((uchar*)0xd012)
 #define BORDER ((uchar*)0xd020)
 #define BORDER_CHANGE __asm__("inc $d020")
@@ -156,33 +158,40 @@ render_marquee_loop:
 void main(void)
 {
     uchar i;
+    uchar frame;
     copy_char_bitmaps_to_0x3000();
     init_marquee(message, MESSAGE_LEN);
+    BORDER_RESET;
+    *HORIZONTAL_SCROLL = *HORIZONTAL_SCROLL & 247; // enable 38 column mode
 
     while (1) {
+        // one whole cycle of the marquee
         for (i = 0; i < MARQUEE_ROW_LEN; i++) {
-            // while (*RASTER_COUNTER != 64);
-            __asm__("lda #64");
-            rasterwait:
-            __asm__("cmp $d012"); // VIC2 raster index/counter
-            __asm__("bne %g", rasterwait);
-            BORDER_RESET;
 
-            BORDER_CHANGE;
-            render_marquee_row(SCREEN,     row0, i);
-            BORDER_CHANGE;
-            render_marquee_row(SCREEN+ 40, row1, i);
-            BORDER_CHANGE;
-            render_marquee_row(SCREEN+ 80, row2, i);
-            BORDER_CHANGE;
-            render_marquee_row(SCREEN+120, row3, i);
-            BORDER_CHANGE;
-            render_marquee_row(SCREEN+160, row4, i);
-            BORDER_CHANGE;
-            render_marquee_row(SCREEN+200, row5, i);
-            BORDER_CHANGE;
-            render_marquee_row(SCREEN+240, row6, i);
-            BORDER_CHANGE;
+            for (frame = 8; frame != 0; frame--) {
+                //*(SCREEN+280) = frame; // frame counter
+
+                // while (*RASTER_COUNTER != 64);
+                __asm__("lda #48");
+                rasterwait:
+                __asm__("cmp $d012"); // VIC2 raster index/counter
+                __asm__("bne %g", rasterwait);
+                //BORDER_RESET;
+
+                *HORIZONTAL_SCROLL = (*HORIZONTAL_SCROLL & 248) | frame;
+
+                if (8 == frame) {
+                    // one keyframe of the marquee
+                    render_marquee_row(SCREEN,     row0, i);
+                    render_marquee_row(SCREEN+ 40, row1, i);
+                    render_marquee_row(SCREEN+ 80, row2, i);
+                    render_marquee_row(SCREEN+120, row3, i);
+                    render_marquee_row(SCREEN+160, row4, i);
+                    render_marquee_row(SCREEN+200, row5, i);
+                    render_marquee_row(SCREEN+240, row6, i);
+                    // BORDER_CHANGE;
+                }
+            }
         }
     }
 }
