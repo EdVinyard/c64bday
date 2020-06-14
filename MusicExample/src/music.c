@@ -28,48 +28,18 @@ uchar voice2 = TRIANGLE;
 // 2 eigth notes / sec = 1 eigth note / 16 frames
 // 4 sixteenth notes / sec = 1 sixteenth note / 8 frames
 
-const uchar one_note[] = {
-    // high byte, low byte, frame count
-    16,195,72,  0,0,8,  // half note
-    16,195,72,  0,0,8,
+/*
+    This is the "sequencer" input data, in the form of three-byte 
+    "tuples".  Each tuple consists of:
 
-    16,195,36,  0,0,4, // quarter note
-    16,195,36,  0,0,4,
-    16,195,36,  0,0,4,
-    16,195,36,  0,0,4,
-
-    16,195,16,  0,0,4, // eigth note
-    16,195,16,  0,0,4,
-    16,195,16,  0,0,4,
-    16,195,16,  0,0,4,
-    16,195,16,  0,0,4,
-    16,195,16,  0,0,4,
-    16,195,16,  0,0,4,
-    16,195,16,  0,0,4,
-
-    16,195,8,   0,0,2, // sixteenth note
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    16,195,8,   0,0,2,
-    };
-
-
+    - frequency high byte
+    - frequency low byte
+    - frame count (40 == quarter note)
+    
+    The frequency values here are from the C64 Programmer's 
+    Reference Guide, starting at page 384.
+*/
 const uchar happy_birthday_music[] = {
-    // high byte, low byte, frame count (40 == quarter note)
-
     // happy birthday to you,
     16,195,26, 0,0,4, // C4, dotted eighth
     16,195, 8, 0,0,2, // C4, sixteenth
@@ -110,7 +80,6 @@ const uchar happy_birthday_music[] = {
     22, 96,60,        // F4, dotted quarter
 
     0,0,120,          // dotted half rest
-
 };
 
 void clear_sid_registers() {
@@ -150,9 +119,10 @@ void crummy_sequencer() {
         }
     }
 
-    seq_duration -= 1;//2;
+    seq_duration -= 1;
 }
 
+uchar rbws_frame = 0;
 void raster_busy_wait_sequencer() {
     while (1) {
         //while (*RASTER_COUNTER != 64);
@@ -162,7 +132,10 @@ void raster_busy_wait_sequencer() {
         __asm__("bne %g", rasterwait);        
 
         *BORDER = YELLOW;
-        crummy_sequencer();
+        if (rbws_frame & 1) {
+            crummy_sequencer();
+        }
+        rbws_frame++;
         BORDER_RESET;
     }
 }
