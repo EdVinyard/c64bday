@@ -21,35 +21,12 @@ __asm__("sta $d020")
 uchar voice1 = PULSE;
 uchar voice2 = TRIANGLE;
 
-const uchar single_voice_data[] = {
-    25,177,250,
-    28,214,250,
-
-    25,177,250,
-    25,177,250,
-
-    25,177,120,
-    28,214,120,
-
-    32,94,750,
-    25,177,250,
-    19,63,250,
-    19,63,250,
-
-    21,154,60, // originally 63
-    24,63,60,
-    
-    25,177,250,
-    24,63,120,
-
-    19,63,250
-    };
-
 // 60 frames/sec
 // ~120 beats/min = ~2 beats/sec = ~1 qt note/sec = 1 quarter note / 32 frames
 // 2 eigth notes / sec = 1 eigth note / 16 frames
 // 4 sixteenth notes / sec = 1 sixteenth note / 8 frames
 
+const uchar before = 3;
 const uchar one_note[] = {
     // high byte, low byte, frame count
     16,195,72,  0,0,8,  // half note
@@ -87,47 +64,12 @@ const uchar one_note[] = {
     16,195,8,   0,0,2,
     16,195,8,   0,0,2,
     };
+const uchar after = 4;
 
-void single_voice_example() {
-    uchar i;
-    uchar hf;
-    uchar lf;
-    uchar dr;
-    
-    SID_REGISTERS[5] = 9;
-    SID_REGISTERS[6] = 0;
-    SID_REGISTERS[2] = 0; // pulse width low byte
-    SID_REGISTERS[3] = 4; // pulse width high byte
-    SID_REGISTERS[24] = 15; // max volume (per voice or everything?)
-
-    for (i = 0; i < sizeof(single_voice_data); i += 3) {
-        hf = single_voice_data[i+0];
-        lf = single_voice_data[i+1];
-        dr = single_voice_data[i+2];
-
-        SID_REGISTERS[1] = hf;
-        SID_REGISTERS[0] = lf;
-        SID_REGISTERS[4] = voice1 | 1;
-
-        // wait with sound playing
-        for (; dr > 0; dr -= 10) {
-            //while (*RASTER_COUNTER != 64);
-            __asm__("lda #64");
-            rasterwait:
-            __asm__("cmp $d012"); // VIC2 raster index/counter
-            __asm__("bne %g", rasterwait);
-        }
-
-        SID_REGISTERS[4] = voice1;
-
-        // wait in silence
-        for (dr = 50; dr > 0; dr -= 10) {
-            //while (*RASTER_COUNTER != 64);
-            __asm__("lda #64");
-            rasterwait2:
-            __asm__("cmp $d012"); // VIC2 raster index/counter
-            __asm__("bne %g", rasterwait2);
-        }
+void render_one_note_as_chars(uchar* screen) {
+    int i;
+    for (i = 0; i < sizeof(one_note); i++) {
+        screen[i] = one_note[i];
     }
 }
 
@@ -138,73 +80,8 @@ void clear_sid_registers() {
     }
 }
 
-uchar hf;
-uchar lf;
-void two_voice_example() {
-    uchar i;
-    uchar dr;
-    uchar lf_up_a_fifth;
-    uchar hf_up_a_fifth;
-    
-    SID_REGISTERS[5] = 9; // voice 1 attack/decay
-    SID_REGISTERS[6] = 0; // voice 1 sustain/release
-    SID_REGISTERS[2] = 0; // voice 1 pulse width low byte
-    SID_REGISTERS[3] = 8; // voice 1 pulse width high byte    
-
-    SID_REGISTERS[5+7] = 9; // voice 2 attack/decay
-    SID_REGISTERS[6+7] = 0; // voice 2 sustain/release
-
-    SID_REGISTERS[24] = 15; // set max volume
-
-    for (i = 0; i < sizeof(single_voice_data); i += 3) {
-        BORDER_CHANGE;
-
-        hf = single_voice_data[i+0];
-        lf = single_voice_data[i+1];
-        dr = single_voice_data[i+2];
-
-        SID_REGISTERS[1] = hf; // voice 1 frequency high byte
-        SID_REGISTERS[0] = lf; // voice 1 frequency low byte
-        SID_REGISTERS[4] = voice1 | 1;
-
-        // up a perfect fifth
-        lf_up_a_fifth = lf + (lf >> 1);
-        hf_up_a_fifth = hf + (hf >> 1);
-        if (lf_up_a_fifth < lf) {
-            hf_up_a_fifth += 1;
-        }
-
-        SID_REGISTERS[1+7] = hf_up_a_fifth; // voice 2 freq high byte
-        SID_REGISTERS[0+7] = lf_up_a_fifth; // voice 2 freq low byte
-        SID_REGISTERS[4+7] = voice2 | 1; // voice 2 + attack (1)
-
-        BORDER_RESET;
-
-        // wait with sound playing
-        for (; dr > 0; dr -= 10) {
-            //while (*RASTER_COUNTER != 64);
-            __asm__("lda #64");
-            rasterwait:
-            __asm__("cmp $d012"); // VIC2 raster index/counter
-            __asm__("bne %g", rasterwait);
-        }
-
-        SID_REGISTERS[4] = voice1; // voice 1 decay initiated
-        SID_REGISTERS[4+7] = voice2; // voice 2 decay initiated
-
-        // wait in silence
-        for (dr = 50; dr > 0; dr -= 10) {
-            //while (*RASTER_COUNTER != 64);
-            __asm__("lda #64");
-            rasterwait2:
-            __asm__("cmp $d012"); // VIC2 raster index/counter
-            __asm__("bne %g", rasterwait2);
-        }
-    }    
-}
-
-uchar seq_duration;
-uchar seq_index;
+uchar seq_duration = 0; // duration of note, in frames (60 frames/sec)
+uchar seq_index = 0; // current index into note sequence
 void crummy_sequencer() {
     uchar hf;
     uchar lf;
@@ -213,45 +90,36 @@ void crummy_sequencer() {
         // previous note has finished; advance to the next
         seq_index += 3;
 
+        // 𝄇 (if we just played the last note, start over)
         if (seq_index >= sizeof(one_note)) {
-            seq_index = 0;
+            seq_index = 0; 
         }
 
-        hf = one_note[seq_index+0];
-        lf = one_note[seq_index+1];
+        hf           = one_note[seq_index+0];
+        lf           = one_note[seq_index+1];
         seq_duration = one_note[seq_index+2];
+
+        SCREEN[seq_index] = hf;
+        SCREEN[seq_index+1] = lf;
+        SCREEN[seq_index+2] = seq_duration;
 
         if (0 == hf) {
             // release
             SID_REGISTERS[4] = voice1;
         } else {
             // attack
-            SID_REGISTERS[1] = hf;
-            SID_REGISTERS[0] = lf;
+            SID_REGISTERS[1] = 5; //hf;
+            SID_REGISTERS[0] = 0; //lf;
             SID_REGISTERS[4] = voice1 | 1;
         }
     }
 
-    seq_duration -= 2;
+    seq_duration -= 1;//2;
 }
 
-void main(void)
-{
+void raster_busy_wait_sequencer() {
     uchar frame;
 
-    clear_sid_registers();
-    //while (1) single_voice_example();
-    //while (1) two_voice_example();
-
-    voice1 = SAWTOOTH;
-    SID_REGISTERS[ 5] =  0x10; // attack, decay
-    SID_REGISTERS[ 6] =  0xb1; // sustain, release
-    SID_REGISTERS[ 2] =  0; // pulse width low byte
-    SID_REGISTERS[ 3] =  2; // pulse width high byte
-    SID_REGISTERS[24] = 15; // max volume (per voice or everything?)
-
-    seq_duration = 0;
-    seq_index = 0;
     for (frame = 0; ; frame++) {
         //while (*RASTER_COUNTER != 64);
         __asm__("lda #64");
@@ -266,4 +134,81 @@ void main(void)
             BORDER_CHANGE;
         }
     }
+}
+
+void raster_interrupt_handler() {
+    // from https://www.c64-wiki.com/wiki/Raster_interrupt#Using_a_single_interrupt_service_routine
+
+    // change a border scanline yellow to mark the timing of this handler
+    *BORDER = 7; // yellow
+    // __asm__("ldx #255"); // busy-wait ~200 ms
+    // rih_busywait:
+    // __asm__("dex");
+    // __asm__("beq %g", rih_busywait);
+
+    // The data in one_note looks OK here, but is messed up if we invoke
+    // crummy_sequencer.  The C compiler depends on having zero-page set
+    // up just so, and I think the callback from raster interrupt breaks
+    // some assumption about the state of the machine.
+    SCREEN[0] = one_note[3];
+    SCREEN[1] = one_note[4];
+    SCREEN[2] = one_note[2];
+    crummy_sequencer();
+
+    *BORDER = 0; // black
+
+    // "Acknowledge" the interrupt by clearing the VIC's interrupt flag.
+    __asm__("ASL $D019");
+    
+    // Jump into KERNAL's standard interrupt service routine to handle keyboard
+    // scan, cursor display etc.
+    __asm__("JMP $EA31");
+}
+
+void enable_raster_interrupt() {
+    // from https://www.c64-wiki.com/wiki/Raster_interrupt#Setting_up_a_raster_interrupt
+
+    // Switch off interrupts signals from CIA-1
+    __asm__("LDA #%%01111111");
+    __asm__("STA $DC0D");
+    
+    // Clear most significant bit in VIC's raster register 
+	__asm__("AND $D011");
+    __asm__("STA $D011");
+
+    // Set the raster line number where interrupt should occur
+	__asm__("LDA #64"); // TODO: function parameter?
+    __asm__("STA $D012");
+
+    // Set the interrupt vector to point to custom interrupt service routine
+	__asm__("LDA #<%v", raster_interrupt_handler); // TODO: parameter?
+    __asm__("STA $0314");
+    __asm__("LDA #>%v", raster_interrupt_handler);
+    __asm__("STA $0315");
+
+    // Enable raster interrupt signals from VIC
+	__asm__("LDA #%%00000001");
+    __asm__("STA $D01A");
+}
+
+// #define INTERRUPT_SEQUENCER
+void main(void)
+{
+    clear_sid_registers();
+    voice1 = SAWTOOTH;
+    SID_REGISTERS[ 5] =  0x10; // attack, decay
+    SID_REGISTERS[ 6] =  0xb1; // sustain, release
+    SID_REGISTERS[ 2] =  0; // pulse width low byte
+    SID_REGISTERS[ 3] =  2; // pulse width high byte
+    SID_REGISTERS[24] = 15; // max volume (per voice or everything?)
+
+    render_one_note_as_chars(SCREEN+320);
+#ifndef INTERRUPT_SEQUENCER
+    __asm__("lda $DC0E");       // disabled interrupts
+    __asm__("and #%%11111110");
+    __asm__("sta $DC0E");
+    raster_busy_wait_sequencer();
+#else
+    enable_raster_interrupt();
+#endif
 }
