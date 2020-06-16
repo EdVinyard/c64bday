@@ -20,6 +20,7 @@
 #define HORIZONTAL_SCROLL ((uchar*)0xd016)
 
 #define RASTER_COUNTER ((uchar*)0xd012)
+#define CLEAR_SCREEN __asm__("jsr $e544")
 #define BACKGROUND ((uchar*)0xd021)
 #define BORDER ((uchar*)0xd020)
 #define BORDER_CHANGE __asm__("inc $d020")
@@ -28,6 +29,7 @@ __asm__("lda #0"); \
 __asm__("sta $d020")
 
 #define BLACK (0)
+#define YELLOW (7)
 #define DARK_GREY (11)
 #define GREY (12)
 #define LIGHT_GREY (15)
@@ -267,7 +269,7 @@ void clear_sid_registers() {
     }
 }
 
-uchar lead_duration = 0; // duration of note, in frames (60 frames/sec)
+uchar lead_duration = 0; // remaining duration of note, in frames (60 frames/sec)
 uchar lead_index = 253; // current index into note sequence
 void lead_sequencer() {
     uchar hf;
@@ -300,7 +302,7 @@ void lead_sequencer() {
     lead_duration -= 2;
 }
 
-uchar harmony_duration = 0; // duration of note, in frames (60 frames/sec)
+uchar harmony_duration = 0; // remaining duration of note, in frames (60 frames/sec)
 uchar harmony_index = 253; // current index into note sequence
 void harmony_sequencer() {
     uchar hf;
@@ -333,12 +335,15 @@ void harmony_sequencer() {
     harmony_duration -= 2;
 }
 
-
 void main(void)
 {
-    // marquee setup
     uchar i;
     uchar frame;
+
+    // marquee setup
+    CLEAR_SCREEN;
+    *BORDER = BLACK;
+    *BACKGROUND = BLACK;
     copy_char_bitmaps_to_0x3000();
     init_marquee(message, MESSAGE_LEN);
     *HORIZONTAL_SCROLL = *HORIZONTAL_SCROLL & 247; // enable 38 column mode
@@ -346,39 +351,39 @@ void main(void)
     // music setup
     clear_sid_registers();
     voice1 = SAWTOOTH;
-    SID_REGISTERS[ 5] =  0x10; // lead attack, decay
-    SID_REGISTERS[ 6] =  0xb1; // lead sustain, release
-    SID_REGISTERS[ 2] =  0; // pulse width low byte
-    SID_REGISTERS[ 3] =  2; // pulse width high byte
+    SID_REGISTERS[ 5] =  0x10;  // lead attack, decay
+    SID_REGISTERS[ 6] =  0xb1;  // lead sustain, release
+    SID_REGISTERS[ 2] =  0;     // pulse width low byte
+    SID_REGISTERS[ 3] =  2;     // pulse width high byte
 
-    SID_REGISTERS[5+7] = 9; // harmony attack/decay
-    SID_REGISTERS[6+7] = 0xe1; // harmony sustain/release
+    SID_REGISTERS[5+7] = 9;     // harmony attack/decay
+    SID_REGISTERS[6+7] = 0xe1;  // harmony sustain/release
 
-    SID_REGISTERS[24] = 15; // max volume (per voice or everything?)
+    SID_REGISTERS[24] = 15;     // max volume!
 
-    __asm__("lda $DC0E");       // disabled interrupts
+    __asm__("lda $DC0E");       // disable interrupts
     __asm__("and #%%11111110");
     __asm__("sta $DC0E");    
-    BORDER_RESET;
 
     while (1) {
-        // one whole cycle of the marquee
+        // one cycle of the entire marquee message
         for (i = 0; i < MARQUEE_ROW_LEN; i++) {
 
+            // marque moves one whole character to the left
             for (frame = 8; frame != 0; frame--) {
-                //*(SCREEN+280) = frame; // frame counter
-
-                // while (*RASTER_COUNTER != 64);
+                // while (*RASTER_COUNTER != 190);
                 __asm__("lda #190");
                 rasterwait:
                 __asm__("cmp $d012"); // VIC2 raster index/counter
                 __asm__("bne %g", rasterwait);
-                //BORDER_RESET;
+                
+                BORDER_RESET;       // raster timing
+                *BORDER = YELLOW;
 
                 *HORIZONTAL_SCROLL = (*HORIZONTAL_SCROLL & 248) | frame;
 
                 if (8 == frame) {
-                    // one keyframe of the marquee
+                    // advance one key-frame of the marquee
                     render_marquee_row(SCREEN+720, row0, i);
                     render_marquee_row(SCREEN+760, row1, i);
                     render_marquee_row(SCREEN+800, row2, i);
@@ -388,9 +393,12 @@ void main(void)
                     render_marquee_row(SCREEN+960, row6, i);
                     // BORDER_CHANGE;
                 } else if (frame & 1) {
+                    // advance the music sequencers
                     lead_sequencer();
                     harmony_sequencer();
                 }
+
+                BORDER_RESET;       // raster timing
             }
         }
     }
