@@ -3,6 +3,8 @@
 
 #define SCREEN ((uchar*)0x0400)
 #define COLORS ((uchar*)0xD800)
+#define CURSOR_COLOR ((uchar*)0x0286)
+#define CURSOR ((uchar*)0x00cc)
 #define ROWS (25)
 #define COLS (40)
 
@@ -43,7 +45,7 @@ __asm__("sta $d020")
 uchar voice1 = PULSE;
 uchar voice2 = SAWTOOTH;
 
-#define MESSAGE_LEN (22)
+#define MESSAGE_LEN (21)
 // max 214
 #define MARQUEE_ROW_LEN (7*MESSAGE_LEN + 40)
 uchar row0[256];
@@ -59,8 +61,8 @@ uchar message[MESSAGE_LEN] = {
     8,1,16, 16,25,32,
     // "BIRTHDAY ",
     2,9,18, 20,8,4, 1,25,32,
-    // "JOHN!  "
-    10,15,8, 14,33,32, 32,
+    // "JIM!  "
+    10,9,13, 33,32,32,
     };
 
 /* 
@@ -153,6 +155,21 @@ void init_marquee(uchar* message, uchar len) {
     init_marquee_row(row4, 4, message, len);
     init_marquee_row(row5, 5, message, len);
     init_marquee_row(row6, 6, message, len);
+}
+
+/*
+   Kludge to put the last column of bits back on the 'M' in "JIM" since I 
+   decided I liked the kerning better when scaling the font up if I omitted
+   one of the two empty columns on most characters (except 'M' and 'W').
+*/
+void patch_marquee_m_char() {
+    row0[COLS+126] = FULL_BLOCK;
+    row1[COLS+126] = FULL_BLOCK;
+    row2[COLS+126] = FULL_BLOCK;
+    row3[COLS+126] = FULL_BLOCK;
+    row4[COLS+126] = FULL_BLOCK;
+    row5[COLS+126] = FULL_BLOCK;
+    row6[COLS+126] = FULL_BLOCK;
 }
 
 void render_marquee_row(
@@ -344,8 +361,10 @@ void main(void)
     CLEAR_SCREEN;
     *BORDER = BLACK;
     *BACKGROUND = BLACK;
+
     copy_char_bitmaps_to_0x3000();
     init_marquee(message, MESSAGE_LEN);
+    patch_marquee_m_char();
     *HORIZONTAL_SCROLL = *HORIZONTAL_SCROLL & 247; // enable 38 column mode
 
     // music setup
@@ -372,25 +391,27 @@ void main(void)
             // marque moves one whole character to the left
             for (frame = 8; frame != 0; frame--) {
                 // while (*RASTER_COUNTER != 190);
-                __asm__("lda #190");
+                __asm__("lda #111");
+                // 190 for text at bottom of screen
                 rasterwait:
                 __asm__("cmp $d012"); // VIC2 raster index/counter
                 __asm__("bne %g", rasterwait);
                 
-                BORDER_RESET;       // raster timing
-                *BORDER = YELLOW;
+                // BORDER_RESET;       // raster timing
+                // *BORDER = YELLOW;
 
                 *HORIZONTAL_SCROLL = (*HORIZONTAL_SCROLL & 248) | frame;
 
                 if (8 == frame) {
                     // advance one key-frame of the marquee
-                    render_marquee_row(SCREEN+720, row0, i);
-                    render_marquee_row(SCREEN+760, row1, i);
-                    render_marquee_row(SCREEN+800, row2, i);
-                    render_marquee_row(SCREEN+840, row3, i);
-                    render_marquee_row(SCREEN+880, row4, i);
-                    render_marquee_row(SCREEN+920, row5, i);
-                    render_marquee_row(SCREEN+960, row6, i);
+                    render_marquee_row(SCREEN+320, row0, i);
+                    render_marquee_row(SCREEN+360, row1, i);
+                    render_marquee_row(SCREEN+400, row2, i);
+                    render_marquee_row(SCREEN+440, row3, i);
+                    render_marquee_row(SCREEN+480, row4, i);
+                    render_marquee_row(SCREEN+520, row5, i);
+                    render_marquee_row(SCREEN+560, row6, i);
+                    // last screen row starts at SCREEN+960
                     // BORDER_CHANGE;
                 } else if (frame & 1) {
                     // advance the music sequencers
@@ -398,7 +419,7 @@ void main(void)
                     harmony_sequencer();
                 }
 
-                BORDER_RESET;       // raster timing
+                // BORDER_RESET;       // raster timing
             }
         }
     }
