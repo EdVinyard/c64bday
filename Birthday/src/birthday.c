@@ -337,6 +337,22 @@ void harmony_sequencer() {
     harmony_duration -= 2;
 }
 
+/*
+    Draw a horizontal, full-character-height colored row/bar
+    across the screen (full 40-column width).
+ */
+void render_color_row(
+    uchar* screen_row, 
+    uchar* color_row,
+    uchar color)
+{
+    uchar i;
+    for (i = 0; i < 40; i++) {
+        screen_row[i] = FULL_BLOCK;
+        color_row[i] = color;
+    }
+}
+
 void main(void)
 {
     uchar i;
@@ -349,6 +365,7 @@ void main(void)
 
     copy_char_bitmaps_to_0x3000();
     init_marquee(message, MESSAGE_LEN);
+
     *HORIZONTAL_SCROLL = *HORIZONTAL_SCROLL & 247; // enable 38 column mode
 
     // music setup
@@ -366,16 +383,21 @@ void main(void)
 
     __asm__("lda $DC0E");       // disable interrupts
     __asm__("and #%%11111110");
-    __asm__("sta $DC0E");    
+    __asm__("sta $DC0E");
+
+    render_color_row(SCREEN, COLORS, 7);
 
     while (1) {
         // one cycle of the entire marquee message
         for (i = 0; i < MARQUEE_ROW_LEN; i++) {
 
             // marque moves one whole character to the left
-            for (frame = 8; frame != 0; frame--) {
+            //for (frame = 8; frame != 0; frame--) {
+            frame = 8;
+            do {
+                frame--;
                 // while (*RASTER_COUNTER != 190);
-                __asm__("lda #111");
+                __asm__("lda #180");
                 // 190 for text at bottom of screen
                 rasterwait:
                 __asm__("cmp $d012"); // VIC2 raster index/counter
@@ -386,7 +408,7 @@ void main(void)
 
                 *HORIZONTAL_SCROLL = (*HORIZONTAL_SCROLL & 248) | frame;
 
-                if (8 == frame) {
+                if (7 == frame) {
                     // advance one key-frame of the marquee
                     render_marquee_row(SCREEN+320, row0, i);
                     render_marquee_row(SCREEN+360, row1, i);
@@ -397,14 +419,14 @@ void main(void)
                     render_marquee_row(SCREEN+560, row6, i);
                     // last screen row starts at SCREEN+960
                     // BORDER_CHANGE;
-                } else if (frame & 1) {
+                } else if (0 == (frame & 1)) {
                     // advance the music sequencers
                     lead_sequencer();
                     harmony_sequencer();
                 }
 
                 // BORDER_RESET;       // raster timing
-            }
+            } while (frame != 0);
         }
     }
 }
