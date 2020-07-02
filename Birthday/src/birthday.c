@@ -164,7 +164,7 @@ void render_marquee_row(
 {
     register uchar* screen = _screen;
     register uchar* source = _source + _offset;
-    __asm__("ldy #40");
+    __asm__("ldy #39");
 
 render_marquee_loop:
     __asm__("lda (%v),y", source);
@@ -385,7 +385,22 @@ void main(void)
     __asm__("and #%%11111110");
     __asm__("sta $DC0E");
 
-    render_color_row(SCREEN, COLORS, 7);
+    render_color_row(SCREEN, COLORS, 7); // yellow
+    render_color_row(SCREEN+40, COLORS+40, 6); // blue
+    render_color_row(SCREEN+80, COLORS+80, 13); // light green
+    render_color_row(SCREEN+120, COLORS+120, 4); // violet
+    render_color_row(SCREEN+160, COLORS+160, 3); // cyan
+    render_color_row(SCREEN+200, COLORS+200, 2); // red
+    render_color_row(SCREEN+240, COLORS+240, 14); // light blue
+
+
+    render_color_row(SCREEN+880, COLORS+880, 7); // yellow
+    render_color_row(SCREEN+840, COLORS+840, 6); // blue
+    render_color_row(SCREEN+800, COLORS+800, 13); // light green
+    render_color_row(SCREEN+760, COLORS+760, 4); // violet
+    render_color_row(SCREEN+720, COLORS+720, 3); // cyan
+    render_color_row(SCREEN+680, COLORS+680, 2); // red
+    render_color_row(SCREEN+640, COLORS+640, 14); // light blue
 
     while (1) {
         // one cycle of the entire marquee message
