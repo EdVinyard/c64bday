@@ -45,7 +45,7 @@ __asm__("sta $d020")
 uchar voice1 = PULSE;
 uchar voice2 = SAWTOOTH;
 
-#define MESSAGE_LEN (21)
+#define MESSAGE_LEN (22)
 // max 214
 #define MARQUEE_ROW_LEN (7*MESSAGE_LEN + 40)
 uchar row0[256];
@@ -61,8 +61,8 @@ uchar message[MESSAGE_LEN] = {
     8,1,16, 16,25,32,
     // "BIRTHDAY ",
     2,9,18, 20,8,4, 1,25,32,
-    // "JIM!  "
-    10,9,13, 33,32,32,
+    // "JOHN!  "
+    10,15,8, 14,33,32, 32,
     };
 
 /* 
@@ -155,21 +155,6 @@ void init_marquee(uchar* message, uchar len) {
     init_marquee_row(row4, 4, message, len);
     init_marquee_row(row5, 5, message, len);
     init_marquee_row(row6, 6, message, len);
-}
-
-/*
-   Kludge to put the last column of bits back on the 'M' in "JIM" since I 
-   decided I liked the kerning better when scaling the font up if I omitted
-   one of the two empty columns on most characters (except 'M' and 'W').
-*/
-void patch_marquee_m_char() {
-    row0[COLS+126] = FULL_BLOCK;
-    row1[COLS+126] = FULL_BLOCK;
-    row2[COLS+126] = FULL_BLOCK;
-    row3[COLS+126] = FULL_BLOCK;
-    row4[COLS+126] = FULL_BLOCK;
-    row5[COLS+126] = FULL_BLOCK;
-    row6[COLS+126] = FULL_BLOCK;
 }
 
 void render_marquee_row(
@@ -364,7 +349,6 @@ void main(void)
 
     copy_char_bitmaps_to_0x3000();
     init_marquee(message, MESSAGE_LEN);
-    patch_marquee_m_char();
     *HORIZONTAL_SCROLL = *HORIZONTAL_SCROLL & 247; // enable 38 column mode
 
     // music setup
