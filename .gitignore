@@ -1,6 +1,6 @@
 *.d
 *.o
 *.c64
-*.d64
 *.BACKUP
+tool/*.d64
 
